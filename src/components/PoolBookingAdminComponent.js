@@ -4,6 +4,7 @@ import {
     Button,
     CircularProgress,
     Container,
+    TextField,
 } from '@material-ui/core';
 import dayjs from "dayjs";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
@@ -51,6 +52,7 @@ const PoolBookingAdminComponent = ({ bookings, setBookings }) => {
     const [startDate, setStartDate] = useState(dayjs(new Date()));
     const [loading, setLoading] = useState(false);
     const [isReady, setIsReady] = useState(false);
+    const [vacationDays, setVacationDays] = useState('0,1,6');
 
     const generateBookings = () => {
         if (!startDate) {
@@ -62,6 +64,10 @@ const PoolBookingAdminComponent = ({ bookings, setBookings }) => {
         let currentDate = new Date(startDate);
         let daysCount = 0;
 
+        const vacationDaysArr = vacationDays.split(',').map(function (el) { 
+            return parseInt(el, 10); 
+        });
+
         const aBlockApartmentsArray = Array.from({ length: aBlockApartments }, (_, index) => index + 1);
         const bBlockApartmentsArray = Array.from({ length: numberOfApartments - aBlockApartments }, (_, index) => index + 1);
 
@@ -71,8 +77,8 @@ const PoolBookingAdminComponent = ({ bookings, setBookings }) => {
             sessionDate.setHours(10 + (newBookings.length % sessionsPerDay) * 12);
             sessionDate.setMinutes(0);
 
-            // Pazartesi günü kontrolü
-            if (sessionDate.getDay() === 1) {
+            // Tatil günleri kontrolü
+            if (vacationDaysArr.includes(sessionDate.getDay())) {
                 daysCount++;
                 continue;
             }
@@ -148,6 +154,13 @@ const PoolBookingAdminComponent = ({ bookings, setBookings }) => {
                         format="DD/MM/YYYY"
                         onChange={(newValue) => setStartDate(newValue)} />
                 </LocalizationProvider>
+                <TextField 
+                    variant="outlined"
+                    label="Tatil Günleri"
+                    value={vacationDays}
+                    onChange={(event) => setVacationDays(event.target.value.replace(' ', ''))}
+                    helperText="',' ile ayırarak tatil günlerini belirtiniz. (0=Pazar)"
+                />
                 <Button variant="contained" color='primary' className={classes.button} onClick={generateBookings}>
                     Kura Çek
                 </Button>
