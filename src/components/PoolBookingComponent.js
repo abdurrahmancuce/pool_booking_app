@@ -53,13 +53,7 @@ const PoolBookingComponent = ({ bookings }) => {
 
     const getDateFromTimestamp = (timestamp) => {
         const date = new Date(timestamp)
-        return date.toLocaleDateString('tr', { day:'2-digit', month: 'short', year: 'numeric' , weekday: 'short' })
-    }
-
-    const getDateFromString = (stringDate) => {
-        const splitDate = stringDate.split('.');
-        const date = new Date(`${splitDate[1]}.${splitDate[0]}.${splitDate[2]}`)
-        return date.toLocaleDateString('tr', { day:'2-digit', month: 'short', year: 'numeric' , weekday: 'short' })
+        return date.toLocaleString('tr-TR')
     }
 
     return (
@@ -88,7 +82,7 @@ const PoolBookingComponent = ({ bookings }) => {
                                     <TableRow key={index} className={index % 2 === 0 ? 'even' : 'odd'}>
                                         <TableCell>{booking.block}</TableCell>
                                         <TableCell>Daire {booking.apartment}</TableCell>
-                                        <TableCell>{getDateFromString(booking.date)}</TableCell>
+                                        <TableCell>{booking.date}</TableCell>
                                         <TableCell>{booking.session === 1 ? '18:00 - 20:00' : '20:00 - 22:00'}</TableCell>
                                     </TableRow>
                                 ))}
