@@ -1,101 +1,97 @@
-import React from 'react';
-import { makeStyles } from '@material-ui/core/styles';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Container,
-    Typography,
-    Paper,
-} from '@material-ui/core';
-
-const useStyles = makeStyles((theme) => ({
-    root: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-    },
-    controls: {
-        display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: theme.spacing(2),
-        '& > *': {
-            marginLeft: theme.spacing(2),
-            height: '56px',
-            width: '200px'
-        },
-    },
-    tableContainer: {
-        marginBottom: theme.spacing(4),
-    },
-    message: {
-        marginTop: theme.spacing(2),
-        color: '#B36617'
-    },
-    table: {
-        minWidth: 650,
-    },
-    tableHeader: {
-        backgroundColor: theme.palette.primary.main,
-        "& > *": {
-            color: theme.palette.secondary.light,
-            fontWeight: "bold",
-        },
-    },
-}));
+import React, { useMemo, useState } from 'react';
+import { ApartmentOutlined, CalendarMonthOutlined, InfoOutlined, SearchOutlined, ScheduleOutlined, WaterDropOutlined } from '@mui/icons-material';
 
 const PoolBookingComponent = ({ bookings }) => {
-    const classes = useStyles();
+    const [query, setQuery] = useState('');
+    const [block, setBlock] = useState('Tümü');
+    const bookingList = useMemo(() => bookings?.data || [], [bookings]);
 
-    const getDateFromTimestamp = (timestamp) => {
-        const date = new Date(timestamp)
-        return date.toLocaleString('tr-TR')
+    const getDateFromTimestamp = (timestamp) => new Date(timestamp).toLocaleString('tr-TR', {
+        day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+
+    const filteredBookings = useMemo(() => {
+        const normalizedQuery = query.trim().toLocaleLowerCase('tr-TR').replace('daire', '').trim();
+        return bookingList.filter((booking) => {
+            const blockMatches = block === 'Tümü' || booking.block === block;
+            const queryMatches = !normalizedQuery || String(booking.apartment).includes(normalizedQuery) || booking.block.toLocaleLowerCase('tr-TR').includes(normalizedQuery);
+            return blockMatches && queryMatches;
+        });
+    }, [bookingList, block, query]);
+
+    if (!bookingList.length) {
+        return (
+            <section className="surface-card empty-state">
+                <span className="empty-icon"><WaterDropOutlined /></span>
+                <h2>Henüz kura çekilmedi</h2>
+                <p>Yeni dönem kura sonuçları yayınlandığında burada görüntülenecek.</p>
+            </section>
+        );
     }
 
     return (
-        <Container className={classes.root}>
-            {bookings?.data?.length > 0 ? (
+        <section className="surface-card results-card">
+            <div className="section-heading results-heading">
+                <div>
+                    <span className="section-kicker">Güncel liste</span>
+                    <h2>Kura sonuçları</h2>
+                    <p><CalendarMonthOutlined /> {getDateFromTimestamp(bookings.createdAt)} tarihinde yayınlandı</p>
+                </div>
+                <span className="result-count"><strong>{bookingList.length}</strong> daire</span>
+            </div>
+
+            <div className="notice-bar">
+                <InfoOutlined />
+                <p><strong>Hatırlatma:</strong> Pazartesi günleri havuz kapalıdır. Cumartesi ve pazar günleri aile günü uygulaması yoktur.</p>
+            </div>
+
+            <div className="results-toolbar">
+                <label className="search-field">
+                    <SearchOutlined />
+                    <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Daire numaranızı arayın" aria-label="Daire numarası ara" />
+                </label>
+                <div className="block-filter" aria-label="Blok seçimi">
+                    {['Tümü', 'A', 'B'].map((item) => (
+                        <button key={item} className={block === item ? 'active' : ''} type="button" onClick={() => setBlock(item)}>{item === 'Tümü' ? item : `${item} Blok`}</button>
+                    ))}
+                </div>
+            </div>
+
+            {filteredBookings.length ? (
                 <>
-                    <Typography color='secondary' variant="h6" gutterBottom>
-                        <b>Not:</b> Pazartesi günleri havuz kapalıdır.
-                        Cumartesi, Pazar aile günü yoktur.
-                    </Typography>
-                    <Typography color='secondary' variant="h6" gutterBottom>
-                        <b>Kura Tarihi -</b> {getDateFromTimestamp(bookings.createdAt)}
-                    </Typography>
-                    <TableContainer className={classes.tableContainer} component={Paper}>
-                        <Table className={classes.table}>
-                            <TableHead>
-                                <TableRow className={classes.tableHeader}>
-                                    <TableCell>Blok</TableCell>
-                                    <TableCell>Daire No</TableCell>
-                                    <TableCell>Tarih</TableCell>
-                                    <TableCell>Seans</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {bookings.data.map((booking, index) => (
-                                    <TableRow key={index} className={index % 2 === 0 ? 'even' : 'odd'}>
-                                        <TableCell>{booking.block}</TableCell>
-                                        <TableCell>Daire {booking.apartment}</TableCell>
-                                        <TableCell>{booking.date}</TableCell>
-                                        <TableCell>{booking.session === 1 ? '18:00 - 20:00' : '20:00 - 22:00'}</TableCell>
-                                    </TableRow>
+                    <div className="booking-table-wrap">
+                        <table className="booking-table">
+                            <thead><tr><th>Blok</th><th>Daire</th><th>Tarih</th><th>Seans saati</th></tr></thead>
+                            <tbody>
+                                {filteredBookings.map((booking, index) => (
+                                    <tr key={`${booking.block}-${booking.apartment}-${index}`}>
+                                        <td><span className={`block-badge block-${booking.block.toLocaleLowerCase()}`}>{booking.block}</span></td>
+                                        <td><strong>Daire {booking.apartment}</strong></td>
+                                        <td><span className="cell-with-icon"><CalendarMonthOutlined /> {booking.date}</span></td>
+                                        <td><span className="session-pill"><ScheduleOutlined /> {booking.session === 1 ? '18:00 — 20:00' : '20:00 — 22:00'}</span></td>
+                                    </tr>
                                 ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="booking-mobile-list">
+                        {filteredBookings.map((booking, index) => (
+                            <article className="booking-mobile-card" key={`${booking.block}-${booking.apartment}-mobile-${index}`}>
+                                <div className="mobile-card-title">
+                                    <span className={`block-badge block-${booking.block.toLocaleLowerCase()}`}>{booking.block}</span>
+                                    <div><small>{booking.block} Blok</small><strong>Daire {booking.apartment}</strong></div>
+                                    <ApartmentOutlined />
+                                </div>
+                                <div className="mobile-card-meta">
+                                    <span><CalendarMonthOutlined /> {booking.date}</span>
+                                    <span><ScheduleOutlined /> {booking.session === 1 ? '18:00 — 20:00' : '20:00 — 22:00'}</span>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
                 </>
-            ) : (
-                <Typography variant="h5" className={classes.message}>
-                    Kura henüz çekilmemiştir...
-                </Typography>
-            )}
-        </Container>
+            ) : <div className="no-results"><SearchOutlined /><strong>Sonuç bulunamadı</strong><span>Arama veya blok filtresini değiştirmeyi deneyin.</span></div>}
+        </section>
     );
 };
 

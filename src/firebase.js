@@ -47,6 +47,7 @@ const addPoolBookList = async (data) => {
         await addDoc(collection(db, 'poolBookList'), data);
     } catch (error) {
         console.error('An error occured:', error);
+        throw error;
     }
 };
 
@@ -58,7 +59,7 @@ const getLastPoolBookList = async () => {
         return lastDocumentData
     } catch (error) {
         console.error('An error occured:', error);
-        return [];
+        throw error;
     }
 };
 

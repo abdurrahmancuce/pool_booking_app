@@ -7,15 +7,18 @@ import { createTheme } from '@material-ui/core';
 const theme = createTheme({
     palette: {
         primary: {
-            main: "#0c3b2e",
-            light: "#6d9773",
-            contrastText: "#ffba00"
+            main: "#167ca5",
+            light: "#22a9af",
+            contrastText: "#ffffff"
         },
         secondary: {
-            main: "#b46617",
-            light: "#ffba00",
-            contrastText: "#0c3b2e"
+            main: "#ff7c5f",
+            light: "#ffa08a",
+            contrastText: "#ffffff"
         },
+    },
+    typography: {
+        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     },
 });
 

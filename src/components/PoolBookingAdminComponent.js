@@ -1,177 +1,153 @@
 import React, { useState } from 'react';
-import { makeStyles } from '@material-ui/core/styles';
-import {
-    Button,
-    CircularProgress,
-    Container,
-    TextField,
-} from '@material-ui/core';
-import dayjs from "dayjs";
-import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import { CircularProgress, TextField } from '@material-ui/core';
+import { Alert, Snackbar } from '@mui/material';
+import { AdminPanelSettingsOutlined, CalendarMonthOutlined, CasinoOutlined, CheckCircleOutline, PublishOutlined } from '@mui/icons-material';
+import dayjs from 'dayjs';
+import 'dayjs/locale/tr';
+import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { addPoolBookList } from '../firebase';
 
-const useStyles = makeStyles((theme) => ({
-    root: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        marginTop: theme.spacing(4),
-    },
-    controls: {
-        display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: theme.spacing(2),
-        '& > *': {
-            marginLeft: theme.spacing(2),
-            height: '56px',
-            width: '200px'
-        },
-    },
-    tableContainer: {
-        marginBottom: theme.spacing(4),
-    },
-    message: {
-        marginTop: theme.spacing(2),
-    },
-    button: {
-        fontWeight: 'bold'
-    },
-    spinner: {
-        marginRight: theme.spacing(2),
-    },
-}));
+const getSecureRandomIndex = (maxExclusive) => {
+    const cryptoApi = typeof window !== 'undefined' ? window.crypto : undefined;
+
+    if (!cryptoApi?.getRandomValues) {
+        return Math.floor(Math.random() * maxExclusive);
+    }
+
+    const range = 0x100000000;
+    const unbiasedLimit = range - (range % maxExclusive);
+    const randomValue = new Uint32Array(1);
+
+    do {
+        cryptoApi.getRandomValues(randomValue);
+    } while (randomValue[0] >= unbiasedLimit);
+
+    return randomValue[0] % maxExclusive;
+};
+
+const shuffleApartments = (apartments) => {
+    const shuffled = [...apartments];
+
+    for (let index = shuffled.length - 1; index > 0; index--) {
+        const randomIndex = getSecureRandomIndex(index + 1);
+        [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+    }
+
+    return shuffled;
+};
+
+export const createFairBookings = (startDate, vacationDays) => {
+    const vacationDaysArr = vacationDays
+        .split(',')
+        .map((day) => day.trim())
+        .filter(Boolean)
+        .map(Number);
+
+    const hasInvalidDay = vacationDaysArr.some((day) => !Number.isInteger(day) || day < 0 || day > 6);
+    if (hasInvalidDay) throw new Error('Tatil günlerini 0 ile 6 arasında, virgülle ayırarak girin.');
+    if (new Set(vacationDaysArr).size === 7) throw new Error('Haftanın en az bir günü kullanıma açık olmalıdır.');
+
+    const apartments = [
+        ...Array.from({ length: 12 }, (_, index) => ({ block: 'A', apartment: index + 1 })),
+        ...Array.from({ length: 48 }, (_, index) => ({ block: 'B', apartment: index + 1 })),
+    ];
+    const shuffledApartments = shuffleApartments(apartments);
+    const generatedBookings = [];
+    const currentDate = startDate.toDate();
+    currentDate.setHours(12, 0, 0, 0);
+
+    while (generatedBookings.length < shuffledApartments.length) {
+        if (!vacationDaysArr.includes(currentDate.getDay())) {
+            for (let session = 1; session <= 2 && generatedBookings.length < shuffledApartments.length; session++) {
+                const apartment = shuffledApartments[generatedBookings.length];
+                generatedBookings.push({
+                    date: currentDate.toLocaleDateString('tr-TR'),
+                    apartment: apartment.apartment,
+                    block: apartment.block,
+                    session,
+                });
+            }
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return generatedBookings.sort((a, b) => a.block !== b.block ? a.block.localeCompare(b.block) : a.apartment - b.apartment);
+};
 
 const PoolBookingAdminComponent = ({ bookings, setBookings }) => {
-    const classes = useStyles();
-    const numberOfApartments = 60;
-    const sessionsPerDay = 2;
-    const aBlockApartments = 12;
-
     const [startDate, setStartDate] = useState(dayjs(new Date()));
     const [loading, setLoading] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [vacationDays, setVacationDays] = useState('0,1,6');
+    const [notification, setNotification] = useState({ open: false, severity: 'success', message: '' });
+
+    const showNotification = (severity, message) => setNotification({ open: true, severity, message });
 
     const generateBookings = () => {
         if (!startDate) {
-            alert('Başlangıç tarihini seçiniz.');
+            showNotification('error', 'Lütfen başlangıç tarihini seçin.');
             return;
         }
 
-        const newBookings = [];
-        let currentDate = new Date(startDate);
-        let daysCount = 0;
-
-        const vacationDaysArr = vacationDays.split(',').map(function (el) { 
-            return parseInt(el, 10); 
-        });
-
-        const aBlockApartmentsArray = Array.from({ length: aBlockApartments }, (_, index) => index + 1);
-        const bBlockApartmentsArray = Array.from({ length: numberOfApartments - aBlockApartments }, (_, index) => index + 1);
-
-        while (newBookings.length < numberOfApartments * sessionsPerDay) {
-            const sessionDate = new Date(currentDate);
-            sessionDate.setDate(currentDate.getDate() + (daysCount / 2));
-            sessionDate.setHours(10 + (newBookings.length % sessionsPerDay) * 12);
-            sessionDate.setMinutes(0);
-
-            // Tatil günleri kontrolü
-            if (vacationDaysArr.includes(sessionDate.getDay())) {
-                daysCount++;
-                continue;
-            }
-
-            let apartmentNumber;
-            let block;
-
-            // Random blok seçme
-            let randomBlockIndex = 0
-
-            if (aBlockApartmentsArray.length > 0 && bBlockApartmentsArray.length > 0) {
-                randomBlockIndex = Math.floor(Math.random() * 2);
-            } else if (aBlockApartmentsArray.length > 0 && bBlockApartmentsArray.length === 0) {
-                randomBlockIndex = 0;
-            } else if (aBlockApartmentsArray.length === 0 && bBlockApartmentsArray.length > 0) {
-                randomBlockIndex = 1;
-            }
-
-            if (randomBlockIndex === 0) {
-                const randomApartmentIndex = Math.floor(Math.random() * aBlockApartmentsArray.length);
-                apartmentNumber = aBlockApartmentsArray[randomApartmentIndex];
-                aBlockApartmentsArray.splice(randomApartmentIndex, 1);
-                block = 'A';
-            } else if (randomBlockIndex === 1) {
-                const randomApartmentIndex = Math.floor(Math.random() * bBlockApartmentsArray.length);
-                apartmentNumber = bBlockApartmentsArray[randomApartmentIndex];
-                bBlockApartmentsArray.splice(randomApartmentIndex, 1);
-                block = 'B';
-            }
-
-            newBookings.push({
-                date: sessionDate.toLocaleDateString('tr-TR'),
-                apartment: apartmentNumber,
-                block: block,
-                session: (newBookings.length % sessionsPerDay) + 1,
-            });
-
-            if (aBlockApartmentsArray.length === 0 && bBlockApartmentsArray.length === 0) {
-                break; // Tüm daireler kullanıldı
-            }
-
-            daysCount++;
+        try {
+            const newBookings = createFairBookings(startDate, vacationDays);
+            setBookings(newBookings);
+            setIsReady(true);
+            showNotification('success', 'Yeni kura oluşturuldu. Listeyi kontrol ederek yayınlayabilirsiniz.');
+        } catch (error) {
+            setIsReady(false);
+            showNotification('error', error.message);
         }
-
-        newBookings.sort((a, b) => {
-            if (a.block !== b.block) {
-                return a.block.localeCompare(b.block); // Daire numarası aynı ise blok ismine göre sırala
-            }
-            return a.apartment - b.apartment; // Daire numarasına göre sırala
-        });
-
-        setBookings(newBookings);
-        setIsReady(true);
     };
 
     const publishList = async () => {
-        console.log(bookings)
         setLoading(true);
-        await addPoolBookList(bookings)
-        setLoading(false);
-        setIsReady(false);
-    }
+        try {
+            await addPoolBookList(bookings);
+            setIsReady(false);
+            showNotification('success', 'Kura sonuçları başarıyla yayınlandı.');
+        } catch (error) {
+            showNotification('error', 'Kura sonuçları yayınlanamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
-        <Container className={classes.root}>
-            <div className={classes.controls}>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DatePicker
-                        className={classes.input}
-                        label="Başlangıç Tarihi"
-                        name="date"
-                        value={startDate}
-                        format="DD/MM/YYYY"
-                        onChange={(newValue) => setStartDate(newValue)} />
-                </LocalizationProvider>
-                <TextField 
-                    variant="outlined"
-                    label="Tatil Günleri"
-                    value={vacationDays}
-                    onChange={(event) => setVacationDays(event.target.value.replace(' ', ''))}
-                    helperText="',' ile ayırarak tatil günlerini belirtiniz. (0=Pazar)"
-                />
-                <Button variant="contained" color='primary' className={classes.button} onClick={generateBookings}>
-                    Kura Çek
-                </Button>
-                {bookings?.data?.length > 0 && <Button disabled={loading || !isReady} variant="contained" color='secondary' className={classes.button} onClick={publishList}>
-                    {loading && (
-                        <CircularProgress size={24} className={classes.spinner} />
-                    )}
-                    Yayınla
-                </Button>}
+        <section className="surface-card admin-card">
+            <div className="section-heading admin-heading">
+                <div className="admin-title-icon"><AdminPanelSettingsOutlined /></div>
+                <div><span className="section-kicker">Yönetici alanı</span><h2>Yeni kura oluştur</h2><p>Başlangıç tarihini belirleyin ve dağılımı hazırlayın.</p></div>
+                <span className="secure-badge"><span /> Yetkili oturum</span>
             </div>
-        </Container>
+
+            <div className="admin-form-grid">
+                <label className="admin-field-label">
+                    <span><CalendarMonthOutlined /> Başlangıç tarihi</span>
+                    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="tr">
+                        <DatePicker value={startDate} format="DD/MM/YYYY" onChange={(newValue) => setStartDate(newValue)} slotProps={{ textField: { fullWidth: true, size: 'small' } }} />
+                    </LocalizationProvider>
+                    <small className="admin-control-note">Kura döneminin ilk günü</small>
+                </label>
+                <label className="admin-field-label">
+                    <span>Tatil günleri</span>
+                    <TextField variant="outlined" size="small" fullWidth value={vacationDays} onChange={(event) => setVacationDays(event.target.value.replace(' ', ''))} />
+                    <small className="admin-control-note">0=Pazar, 1=Pazartesi, 6=Cumartesi</small>
+                </label>
+                <button className="draw-action" type="button" onClick={generateBookings}><CasinoOutlined /> Kura çek</button>
+                <button className="publish-action" disabled={loading || !isReady} type="button" onClick={publishList}>
+                    {loading ? <CircularProgress size={21} color="inherit" /> : <PublishOutlined />}{loading ? 'Yayınlanıyor…' : 'Yayınla'}
+                </button>
+            </div>
+
+            {isReady && <div className="draft-notice"><CheckCircleOutline /><span><strong>Kura hazır.</strong> Aşağıdaki listeyi kontrol edip yayınlayabilirsiniz.</span></div>}
+            <Snackbar open={notification.open} autoHideDuration={5000} onClose={() => setNotification((current) => ({ ...current, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+                <Alert severity={notification.severity} variant="filled" onClose={() => setNotification((current) => ({ ...current, open: false }))}>
+                    {notification.message}
+                </Alert>
+            </Snackbar>
+        </section>
     );
 };
 
