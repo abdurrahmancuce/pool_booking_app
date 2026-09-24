@@ -1,0 +1,19 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="8" y1="5" x2="55" y2="59" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#24B8B5"/>
+      <stop offset="1" stop-color="#126B96"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="22" y1="17" x2="43" y2="43" gradientUnits="userSpaceOnUse">
+      <stop stop-color="white" stop-opacity=".98"/>
+      <stop offset="1" stop-color="#D9FAF7" stop-opacity=".88"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="18" fill="url(#bg)"/>
+  <circle cx="48" cy="15" r="5" fill="#FF9278"/>
+  <path d="M15 42V24.5C15 22.57 16.57 21 18.5 21H29V42" stroke="url(#glass)" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M29 42V17.5C29 15.57 30.57 14 32.5 14H43C44.1 14 45 14.9 45 16V42" stroke="url(#glass)" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M21 28H24M21 34H24M35 21H39M35 27H39M35 33H39" stroke="white" stroke-width="2.3" stroke-linecap="round"/>
+  <path d="M10 45.5C14 42.5 18 42.5 22 45.5C26 48.5 30 48.5 34 45.5C38 42.5 42 42.5 46 45.5C49 47.75 52 48.31 55 47.19" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <path d="M13 52C16 50.2 19 50.2 22 52C25 53.8 28 53.8 31 52C34 50.2 37 50.2 40 52C43 53.8 46 53.8 49 52" stroke="white" stroke-opacity=".58" stroke-width="2.3" stroke-linecap="round"/>
+</svg>
