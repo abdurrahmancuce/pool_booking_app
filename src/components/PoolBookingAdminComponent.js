@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { CircularProgress, TextField } from '@material-ui/core';
-import { Alert, Snackbar } from '@mui/material';
-import { AdminPanelSettingsOutlined, CalendarMonthOutlined, CasinoOutlined, CheckCircleOutline, PublishOutlined } from '@mui/icons-material';
+import { Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Snackbar } from '@mui/material';
+import { AdminPanelSettingsOutlined, CalendarMonthOutlined, CasinoOutlined, CheckCircleOutline, EventAvailableOutlined, PublishOutlined } from '@mui/icons-material';
 import dayjs from 'dayjs';
 import 'dayjs/locale/tr';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { addPoolBookList } from '../firebase';
+import { formatBookingPeriodDate, getBookingPeriod, isBookingPeriodActive } from '../utils/bookingPeriod';
 
 const getSecureRandomIndex = (maxExclusive) => {
     const cryptoApi = typeof window !== 'undefined' ? window.crypto : undefined;
@@ -80,7 +81,10 @@ const PoolBookingAdminComponent = ({ bookings, setBookings }) => {
     const [loading, setLoading] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [vacationDays, setVacationDays] = useState('0,1,6');
+    const [earlyDrawDialogOpen, setEarlyDrawDialogOpen] = useState(false);
+    const [publishDialogOpen, setPublishDialogOpen] = useState(false);
     const [notification, setNotification] = useState({ open: false, severity: 'success', message: '' });
+    const activePeriod = getBookingPeriod(bookings?.data);
 
     const showNotification = (severity, message) => setNotification({ open: true, severity, message });
 
@@ -101,7 +105,27 @@ const PoolBookingAdminComponent = ({ bookings, setBookings }) => {
         }
     };
 
+    const requestBookingsGeneration = () => {
+        if (!startDate) {
+            showNotification('error', 'Lütfen başlangıç tarihini seçin.');
+            return;
+        }
+
+        if (isBookingPeriodActive(bookings?.data)) {
+            setEarlyDrawDialogOpen(true);
+            return;
+        }
+
+        generateBookings();
+    };
+
+    const confirmEarlyGeneration = () => {
+        setEarlyDrawDialogOpen(false);
+        generateBookings();
+    };
+
     const publishList = async () => {
+        setPublishDialogOpen(false);
         setLoading(true);
         try {
             await addPoolBookList(bookings);
@@ -122,6 +146,16 @@ const PoolBookingAdminComponent = ({ bookings, setBookings }) => {
                 <span className="secure-badge"><span /> Yetkili oturum</span>
             </div>
 
+            {activePeriod && (
+                <div className="active-period-note">
+                    <EventAvailableOutlined />
+                    <div>
+                        <strong>Aktif kura {formatBookingPeriodDate(activePeriod.endDate)} tarihinde sona eriyor.</strong>
+                        <span>Yeni kura tarihi: {formatBookingPeriodDate(activePeriod.nextDrawDate)}</span>
+                    </div>
+                </div>
+            )}
+
             <div className="admin-form-grid">
                 <label className="admin-field-label">
                     <span><CalendarMonthOutlined /> Başlangıç tarihi</span>
@@ -135,13 +169,39 @@ const PoolBookingAdminComponent = ({ bookings, setBookings }) => {
                     <TextField variant="outlined" size="small" fullWidth value={vacationDays} onChange={(event) => setVacationDays(event.target.value.replace(' ', ''))} />
                     <small className="admin-control-note">0=Pazar, 1=Pazartesi, 6=Cumartesi</small>
                 </label>
-                <button className="draw-action" type="button" onClick={generateBookings}><CasinoOutlined /> Kura çek</button>
-                <button className="publish-action" disabled={loading || !isReady} type="button" onClick={publishList}>
+                <button className="draw-action" type="button" onClick={requestBookingsGeneration}><CasinoOutlined /> Kura çek</button>
+                <button className="publish-action" disabled={loading || !isReady} type="button" onClick={() => setPublishDialogOpen(true)}>
                     {loading ? <CircularProgress size={21} color="inherit" /> : <PublishOutlined />}{loading ? 'Yayınlanıyor…' : 'Yayınla'}
                 </button>
             </div>
 
             {isReady && <div className="draft-notice"><CheckCircleOutline /><span><strong>Kura hazır.</strong> Aşağıdaki listeyi kontrol edip yayınlayabilirsiniz.</span></div>}
+            <Dialog open={earlyDrawDialogOpen} onClose={() => setEarlyDrawDialogOpen(false)} aria-labelledby="early-draw-dialog-title">
+                <DialogTitle id="early-draw-dialog-title">Aktif kura süresi henüz bitmedi</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Mevcut kura {activePeriod && formatBookingPeriodDate(activePeriod.endDate)} tarihine kadar geçerli.
+                        Yeni kuranın {activePeriod && formatBookingPeriodDate(activePeriod.nextDrawDate)} tarihinde çekilmesi önerilir.
+                        Yine de devam etmek istiyor musunuz?
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setEarlyDrawDialogOpen(false)}>Vazgeç</Button>
+                    <Button variant="contained" color="warning" onClick={confirmEarlyGeneration}>Yine de devam et</Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog open={publishDialogOpen} onClose={() => setPublishDialogOpen(false)} aria-labelledby="publish-dialog-title">
+                <DialogTitle id="publish-dialog-title">Kura sonuçları yayınlansın mı?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Hazırlanan kura listesi site sakinleriyle paylaşılacak. Yayınladıktan sonra bu liste güncel kura olarak görüntülenecek.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPublishDialogOpen(false)}>Vazgeç</Button>
+                    <Button variant="contained" onClick={publishList}>Onayla ve yayınla</Button>
+                </DialogActions>
+            </Dialog>
             <Snackbar open={notification.open} autoHideDuration={5000} onClose={() => setNotification((current) => ({ ...current, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 <Alert severity={notification.severity} variant="filled" onClose={() => setNotification((current) => ({ ...current, open: false }))}>
                     {notification.message}

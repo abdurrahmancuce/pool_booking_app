@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { ApartmentOutlined, CalendarMonthOutlined, InfoOutlined, SearchOutlined, ScheduleOutlined, WaterDropOutlined } from '@mui/icons-material';
+import { ApartmentOutlined, CalendarMonthOutlined, EventAvailableOutlined, InfoOutlined, SearchOutlined, ScheduleOutlined, WaterDropOutlined } from '@mui/icons-material';
+import { formatBookingPeriodDate, getBookingPeriod } from '../utils/bookingPeriod';
 
 const PoolBookingComponent = ({ bookings }) => {
     const [query, setQuery] = useState('');
     const [block, setBlock] = useState('Tümü');
     const bookingList = useMemo(() => bookings?.data || [], [bookings]);
+    const bookingPeriod = useMemo(() => getBookingPeriod(bookingList), [bookingList]);
 
     const getDateFromTimestamp = (timestamp) => new Date(timestamp).toLocaleString('tr-TR', {
         day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -36,6 +38,7 @@ const PoolBookingComponent = ({ bookings }) => {
                     <span className="section-kicker">Güncel liste</span>
                     <h2>Kura sonuçları</h2>
                     <p><CalendarMonthOutlined /> {getDateFromTimestamp(bookings.createdAt)} tarihinde yayınlandı</p>
+                    {bookingPeriod && <p className="period-end"><EventAvailableOutlined /> Kura dönemi {formatBookingPeriodDate(bookingPeriod.endDate)} tarihinde sona eriyor</p>}
                 </div>
                 <span className="result-count"><strong>{bookingList.length}</strong> daire</span>
             </div>

@@ -1,5 +1,7 @@
 import dayjs from 'dayjs';
-import { createFairBookings } from './PoolBookingAdminComponent';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import PoolBookingAdminComponent, { createFairBookings } from './PoolBookingAdminComponent';
+import { addPoolBookList } from '../firebase';
 
 jest.mock('../firebase', () => ({
     addPoolBookList: jest.fn(),
@@ -30,5 +32,46 @@ describe('adil kura üretimi', () => {
 
     test('haftanın tamamı kapalı seçilemez', () => {
         expect(() => createFairBookings(dayjs('2026-09-22'), '0,1,2,3,4,5,6')).toThrow('en az bir günü');
+    });
+});
+
+describe('aktif kura uyarısı', () => {
+    test('aktif dönem bitmeden kura çekildiğinde devam onayı ister', () => {
+        const setBookings = jest.fn();
+        render(
+            <PoolBookingAdminComponent
+                bookings={{ createdAt: Date.now(), data: [{ date: '31.12.2099' }] }}
+                setBookings={setBookings}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /kura çek/i }));
+
+        expect(screen.getByRole('dialog')).toHaveTextContent('Aktif kura süresi henüz bitmedi');
+        expect(setBookings).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: /yine de devam et/i }));
+
+        expect(setBookings).toHaveBeenCalledTimes(1);
+        expect(setBookings.mock.calls[0][0]).toHaveLength(60);
+    });
+});
+
+describe('yayınlama onayı', () => {
+    test('onay verilmeden kura listesini yayınlamaz', async () => {
+        const setBookings = jest.fn();
+        addPoolBookList.mockResolvedValue();
+        render(<PoolBookingAdminComponent bookings={{ data: [] }} setBookings={setBookings} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /kura çek/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^yayınla$/i }));
+
+        expect(screen.getByRole('dialog')).toHaveTextContent('Kura sonuçları yayınlansın mı?');
+        expect(addPoolBookList).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: /onayla ve yayınla/i }));
+
+        await waitFor(() => expect(addPoolBookList).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(screen.getByText('Kura sonuçları başarıyla yayınlandı.')).toBeInTheDocument());
     });
 });
